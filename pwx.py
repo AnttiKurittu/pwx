@@ -34,9 +34,14 @@
 # about which passwords it holds. It is impossible to list the "stored" passwords
 # so the user needs to remember the exact account name for a given password.
 #
+# DISCLAIMER
 # This software is provided as-is and is provided for educational purposes only
 # It has not been audited by professional cryptography experts and should be
 # considered unsafe until proven otherwise.
+#
+# Future versions will most probably break backwards compatibility with
+# existing databases so DO NOT USE THIS FOR ANY PURPOSES REQUIRING A SECURE
+# PASSWORD
 #
 # (C)opyright Antti Kurittu 2016
 # email antti@kurittu.org
@@ -79,7 +84,11 @@ def getpass():
     if arg.password:
         password = arg.password
     else:
-        password = raw_input("Master password: ")
+        try:
+            password = raw_input("Master password: ")
+        except KeyboardInterrupt:
+            exit()
+    # Hash the password to 32 characters AES can use it for encryption.
     passwordhash = hashlib.md5(hashlib.sha256(password).hexdigest()).hexdigest()
     return passwordhash
 
@@ -100,28 +109,31 @@ arg = parser.parse_args()
 
 # If init is called, create a new "database"
 if arg.init == True:
-    print("Initializing password database. Press CTRL-C to abort.")
+    try:
+        print("Initializing password database. Press CTRL-C to abort.")
 
-    if os.path.isfile(ownPath + arg.file) == True:
-        overwrite = raw_input("Password database exists. Enter \"yes\" to generate new database: ")
-    else:
-        overwrite = "yes"
+        if os.path.isfile(ownPath + arg.file) == True:
+            overwrite = raw_input("Password database exists. Enter \"yes\" to generate new database: ")
+        else:
+            overwrite = "yes"
 
-    if overwrite == "yes":
-        password = getpass()
-        init_database_size = int(input("Specify new database size in KB (suggested size 5000): "))
-        length = (1000 * init_database_size)
-        # Get cryptographically safe random bytes to fill "database" file
-        random_pool = os.urandom(length)
-        # Encrypt random data with master password
-        print("DB verification hash: %s" % hashlib.sha256(random_pool).hexdigest())
-        random_encrypted_contents = AESCipher(password).encrypt(random_pool)
-        database_file = open(ownPath + arg.file, "w+")
-        database_file.write(random_encrypted_contents)
-        database_file.close()
-        print("Wrote the database file at %s" % arg.file)
-        exit()
-    else:
+        if overwrite == "yes":
+            password = getpass()
+            init_database_size = int(input("Specify new database size in KB (suggested size 5000): "))
+            length = (1000 * init_database_size)
+            # Get cryptographically safe random bytes to fill "database" file
+            random_pool = os.urandom(length)
+            print("DB verification hash: %s" % hashlib.sha256(random_pool).hexdigest())
+            # Encrypt random data with master password
+            random_encrypted_contents = AESCipher(password).encrypt(random_pool)
+            database_file = open(ownPath + arg.file, "w+")
+            database_file.write(random_encrypted_contents)
+            database_file.close()
+            print("Wrote the database file at %s" % arg.file)
+            exit()
+        else:
+            exit()
+    except KeyboardInterrupt:
         exit()
 
 if os.path.isfile(ownPath + arg.file) == True:
@@ -192,7 +204,7 @@ while i < (arg.length * 4096):
     chunks.append(chunk)
     locations.append(location)
     if arg.verbose == True:
-        sys.stdout.write("\r => Collated chunk %s, byte location %s " % ( str(chunk).zfill(4), str(location).zfill(len(str(chunk_size))) ))
+        sys.stdout.write("\r => Collated chunk %s, byte location %s (chunk %s)" % ( str(chunk).zfill(4), str(location).zfill(len(str(chunk_size))), i))
         sys.stdout.flush()
     i += 1
 
@@ -208,7 +220,7 @@ for chunk in chunks:
             sys.stdout.write("\n")
         sys.stdout.write("\r => Selecting byte %s out of %s: 0x%s" % (i, (arg.length * 4096), newbyte.encode('hex')))
     seedbytes = seedbytes + newbyte
-    if len(seedbytes) == 64:
+    if len(seedbytes) == 256:
         # Append 64 seed bytes to a pool.
         seedpool.append(seedbytes)
         seedbytes = ""
@@ -221,8 +233,16 @@ if arg.verbose == True:
     sys.stdout.write("\n => Building password from %s\n" % character_pool)
 while len(output) < arg.length:
     # Re-seed the random.choice() for each character with a fresh entry from seedpool
-    random.seed(seedpool.pop())
-    output = output + random.choice(character_pool)
+    i = 0
+    seed = ""
+    while i < 16:
+        i += 1
+        seed = seed + seedpool.pop()
+    random.seed(seed)
+    random_character = random.choice(character_pool)
+    if arg.verbose == True:
+        print " => Seeding with %s... %s bytes, picked character \"%s\"" % (seed.encode('hex')[0:32], len(seed), random_character )
+    output = output + random_character
 
 print("Password: %s" % output)
 exit()
