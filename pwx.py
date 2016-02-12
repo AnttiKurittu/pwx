@@ -37,7 +37,7 @@
 # considered unsafe until proven otherwise.
 #
 # (C)opyright Antti Kurittu 2016
-# antti@kurittu.org
+# email antti@kurittu.org
 
 import os
 import sys
@@ -109,7 +109,7 @@ else:
 
 # If init is called, create a new "database"
 if arg.init == True:
-    print "Initializing password database. Press CTRL-C to abort."
+    print("Initializing password database. Press CTRL-C to abort.")
 
     if os.path.isfile(ownPath + database_file_name) == True:
         overwrite = raw_input("Password database exists. Enter \"yes\" to generate new database: ")
@@ -123,12 +123,12 @@ if arg.init == True:
         # Get cryptographically safe random bytes to fill "database" file
         random_pool = os.urandom(length)
         # Encrypt random data with master password
-        print "Verification hash: %s" % hashlib.sha256(random_pool).hexdigest()
+        print("Verification hash: %s" % hashlib.sha256(random_pool).hexdigest())
         random_encrypted_contents = AESCipher(password).encrypt(random_pool)
         database_file = open(ownPath + database_file_name, "w+")
         database_file.write(random_encrypted_contents)
         database_file.close()
-        print "Wrote the database file at %s" % database_file_name
+        print("Wrote the database file at %s" % database_file_name)
         exit()
     else:
         exit()
@@ -136,13 +136,13 @@ if arg.init == True:
 if os.path.isfile(ownPath + database_file_name) == True:
     database_file = open(ownPath + database_file_name, "r").read()
 else:
-    print "No database file found. Generate a database with --init or specify one with -f."
+    print("No database file found. Generate a database with --init or specify one with -f.")
     exit()
 
 password = getpass()
 # Get and decrypt "database" file.
 decrypted_pool = AESCipher(password).decrypt(database_file)
-print "Verification hash: %s" % hashlib.sha256(decrypted_pool).hexdigest()
+print("Verification hash: %s" % hashlib.sha256(decrypted_pool).hexdigest())
 
 if arg.account:
     account = arg.account
@@ -204,26 +204,35 @@ while i < (password_length * 4096):
     chunks.append(chunk)
     locations.append(location)
     if arg.verbose == True:
-        print "[c: %s, b: %s]" % ( str(chunk).zfill(4), str(location).zfill(len(str(chunk_size))) ),
+        sys.stdout.write("\r => Collated chunk %s, byte location %s " % ( str(chunk).zfill(4), str(location).zfill(len(str(chunk_size))) ))
+        sys.stdout.flush()
     i += 1
 
 # Assign seed bytes from choosing pseudorandomly from random source.
+i = 0
 for chunk in chunks:
+    i += 1
     location = locations.pop()
-    seedbytes = seedbytes + decrypted_chunks[chunk][location]
+    newbyte = decrypted_chunks[chunk][location]
+    if arg.verbose:
+        if i == 1:
+            sys.stdout.write("\n")
+        sys.stdout.write("\r => Selecting byte %s out of %s: 0x%s" % (i, (password_length * 4096), newbyte.encode('hex')))
+    seedbytes = seedbytes + newbyte
 
 # Re-initialize the random seed
+
 if arg.verbose == True:
-    print "\n\nSelected %s seed bytes: %s" % (len(seedbytes), seedbytes.encode('hex'))
-    print
+    sys.stdout.write("\n => Selected %s seed bytes with sha256 value of %s\n" % (len(seedbytes), hashlib.sha256(seedbytes).hexdigest()))
 
 random.seed(seedbytes)
 
 # Finally generate the printable password based on new seed.
-
+if arg.verbose == True:
+    sys.stdout.write(" => Building password from %s\n" % character_pool)
 while len(output) < password_length:
     output = output + random.choice(character_pool)
 
-print "Password: %s" % output
+print("Password: %s" % output)
 decrypted_pool = seedbytes = None
 exit()
