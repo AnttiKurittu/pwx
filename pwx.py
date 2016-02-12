@@ -45,8 +45,9 @@ import random
 import string
 import hashlib
 import argparse
+import time
 from Crypto.Cipher import AES
-from Crypto import Random
+from Crypto import Random as CRandom
 
 # Define AESCipher class
 # Source: http://stackoverflow.com/questions/12524994/encrypt-decrypt-using-pycrypto-aes-256
@@ -60,7 +61,7 @@ class AESCipher:
 
     def encrypt( self, raw ):
         raw = pad(raw)
-        iv = Random.new().read( AES.block_size )
+        iv = CRandom.new().read( AES.block_size )
         cipher = AES.new( self.key, AES.MODE_CBC, iv )
         return iv + cipher.encrypt( raw )
 
@@ -90,6 +91,7 @@ parser.add_argument("-a", "--account", metavar="account name", help="Account to 
 parser.add_argument("-p", "--password", metavar='password', type=str, help="Master password (WARNING! log files may store your shell commands.")
 parser.add_argument("-f", "--file", metavar='database file', type=str, help="database file to use (default: ./pwdb.bin)", default="pwdb.bin")
 parser.add_argument("-l", "--length", metavar='length', type=int, help="Password length (default: 24)", default=24)
+parser.add_argument("-w", "--workfactor", metavar='length', type=int, help="Work factor (n * 1000 iterations of sha256, default n = 1000)", default=1000)
 parser.add_argument("-v", "--verbose", help='Produce more output', action="store_true", default=False)
 parser.add_argument("-i", "--init", help="Initialize the database.", action="store_true", default=False)
 arg = parser.parse_args()
@@ -110,7 +112,7 @@ if arg.init == True:
         # Get cryptographically safe random bytes to fill "database" file
         random_pool = os.urandom(length)
         # Encrypt random data with master password
-        print("Verification hash: %s" % hashlib.sha256(random_pool).hexdigest())
+        print("DB verification hash: %s" % hashlib.sha256(random_pool).hexdigest())
         random_encrypted_contents = AESCipher(password).encrypt(random_pool)
         database_file = open(ownPath + arg.file, "w+")
         database_file.write(random_encrypted_contents)
@@ -129,35 +131,31 @@ else:
 password = getpass()
 # Get and decrypt "database" file.
 decrypted_pool = AESCipher(password).decrypt(database_file)
-print("Verification hash: %s" % hashlib.sha256(decrypted_pool).hexdigest())
+if arg.verbose == True:
+    print(" => DB verification hash: %s" % hashlib.sha256(decrypted_pool).hexdigest())
 
 if arg.account:
     account = arg.account
 else:
     account = raw_input("Key / account: ")
 
-i = s = 0
 # Work factor for n iterations of sha256. This hash is used to seed the
 # pseudorandom generator.
-while i < 1000000:
+i = s = 0
+work_factor = arg.workfactor * 1000
+character_pool = string.ascii_letters + string.digits + '!@#$%^-&*()'
+
+timer_start = time.clock()
+
+while i < work_factor:
     account = hashlib.sha256(account).hexdigest()
     i += 1
-    s += 1
-    if s == 1:
-        sys.stdout.write("\rPassword: .")
-        sys.stdout.flush()
-    if s == 50000:
-        sys.stdout.write("\rPassword: :")
-        sys.stdout.flush()
-    if s == 100000:
-        sys.stdout.write("\rPassword: +")
-        sys.stdout.flush()
-    if s == 150000:
-        s = 0
-        sys.stdout.write("\rPassword: -")
-        sys.stdout.flush()
 
-sys.stdout.write("\r\r\r\r\r\r\r\r\r\r")
+timer_end = time.clock()
+timer_result = (timer_end - timer_start)
+if arg.verbose == True:
+    print "\r => Working time for %s iterations was %s seconds" % ((arg.workfactor * 1000), timer_result)
+
 pseudorandom_seed = hashlib.sha256(str(len(account)) + account + str(arg.length)).hexdigest()
 
 # Split database into a thousand individual chunks.
@@ -178,10 +176,11 @@ while i < 1000:
 # Seed the pseudorangom generator for determining chunk and a byte location inside it.
 random.seed(pseudorandom_seed)
 
-output = seedbytes = ""
+output = ""
+reduced_output = ""
+seedbytes = ""
 chunks = []
 locations = []
-character_pool = string.ascii_letters + string.digits + '!@#$%^-&*()'
 
 # Get a list of chunks and locations inside chunks.
 i = 0
