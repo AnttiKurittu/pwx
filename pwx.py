@@ -73,7 +73,10 @@ class AESCipher:
 # Ask for a password and return a 32 character hash for AES encryption.
 # Characters are not masked because the program prints a plaintext password anyway.
 def getpass():
-    password = raw_input("Master password: ")
+    if arg.password:
+        password = arg.password
+    else:
+        password = raw_input("Master password: ")
     passwordhash = hashlib.md5(hashlib.sha256(password).hexdigest()).hexdigest()
     return passwordhash
 
@@ -84,8 +87,10 @@ if ownPath is "/" or ownPath is "":
 # Get command line arguments.
 parser = argparse.ArgumentParser(description='Get actions')
 parser.add_argument("-a", "--account", metavar="account name", help="Account to view the password for.", type=str)
+parser.add_argument("-p", "--password", metavar='password', type=str, help="Master password (WARNING! log files may store your shell commands.")
 parser.add_argument("-f", "--file", metavar='database file', type=str, help="database file to use (default: ./pwdb.bin)")
 parser.add_argument("-l", "--length", metavar='length', type=int, help="Password length (default: 24)")
+parser.add_argument("-v", "--verbose", help='Produce more output', action="store_true")
 parser.add_argument("-i", "--init", help="Initialize the database.", action="store_true")
 arg = parser.parse_args()
 
@@ -118,8 +123,8 @@ if arg.init == True:
         # Get cryptographically safe random bytes to fill "database" file
         random_pool = os.urandom(length)
         # Encrypt random data with master password
+        print "Verification hash: %s" % hashlib.sha256(random_pool).hexdigest()
         random_encrypted_contents = AESCipher(password).encrypt(random_pool)
-
         database_file = open(ownPath + database_file_name, "w+")
         database_file.write(random_encrypted_contents)
         database_file.close()
@@ -137,11 +142,12 @@ else:
 password = getpass()
 # Get and decrypt "database" file.
 decrypted_pool = AESCipher(password).decrypt(database_file)
+print "Verification hash: %s" % hashlib.sha256(decrypted_pool).hexdigest()
 
 if arg.account:
     account = arg.account
 else:
-    account = raw_input("Account: ")
+    account = raw_input("Key / account: ")
 
 i = s = 0
 # Work factor for n iterations of sha256. This hash is used to seed the
@@ -192,11 +198,13 @@ character_pool = string.ascii_letters + string.digits + '!@#$%^-&*()'
 
 # Get a list of chunks and locations inside chunks.
 i = 0
-while i < password_length:
+while i < (password_length * 256):
     chunk = random.randint(0,999)
     location = random.randint(0,(chunk_size - 1))
     chunks.append(chunk)
     locations.append(location)
+    if arg.verbose == True:
+        print "[c: %s, b: %s]" % ( str(chunk).zfill(4), str(location).zfill(len(str(chunk_size))) ),
     i += 1
 
 # Assign seed bytes from choosing pseudorandomly from random source.
@@ -205,13 +213,17 @@ for chunk in chunks:
     seedbytes = seedbytes + decrypted_chunks[chunk][location]
 
 # Re-initialize the random seed
+if arg.verbose == True:
+    print "\n\nSelected %s seed bytes: %s" % (len(seedbytes), seedbytes.encode('hex'))
+    print
+
 random.seed(seedbytes)
 
 # Finally generate the printable password based on new seed.
-i = 0
-while i < password_length:
+
+while len(output) < password_length:
     output = output + random.choice(character_pool)
-    i += 1
 
 print "Password: %s" % output
+decrypted_pool = seedbytes = None
 exit()
