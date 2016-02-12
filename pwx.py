@@ -76,7 +76,6 @@ class AESCipher:
         iv = enc[:16]
         cipher = AES.new(self.key, AES.MODE_CBC, iv )
         return unpad(cipher.decrypt( enc[16:] ))
-        return cipher.decrypt( enc[16:] )
 
 # Ask for a password and return a 32 character hash for AES encryption.
 # Characters are not masked because the program prints a plaintext password anyway.
@@ -101,42 +100,44 @@ parser = argparse.ArgumentParser(description='Get actions')
 parser.add_argument("-a", "--account", metavar="account name", help="Account to view the password for.", type=str)
 parser.add_argument("-p", "--password", metavar='password', type=str, help="Master password (WARNING! log files may store your shell commands.")
 parser.add_argument("-f", "--file", metavar='database file', type=str, help="database file to use (default: ./pwdb.bin)", default="pwdb.bin")
-parser.add_argument("-l", "--length", metavar='length', type=int, help="Password length (default: 24)", default=24)
-parser.add_argument("-w", "--workfactor", metavar='length', type=int, help="Work factor (n * 1000 iterations of sha256, default n = 1000)", default=1000)
+parser.add_argument("-l", "--length", metavar='length', type=int, help="Password length (default: 32)", default=32)
+parser.add_argument("-w", "--workfactor", metavar='length', type=int, help="Work factor (n * 1000 iterations of sha256, default n = 500)", default=500)
 parser.add_argument("-v", "--verbose", help='Produce more output', action="store_true", default=False)
 parser.add_argument("-i", "--init", help="Initialize the database.", action="store_true", default=False)
 arg = parser.parse_args()
 
 # If init is called, create a new "database"
-if arg.init == True:
+if arg.init:
     try:
         print("Initializing password database. Press CTRL-C to abort.")
 
-        if os.path.isfile(ownPath + arg.file) == True:
+        if os.path.isfile(ownPath + arg.file):
             overwrite = raw_input("Password database exists. Enter \"yes\" to generate new database: ")
         else:
             overwrite = "yes"
 
         if overwrite == "yes":
             password = getpass()
-            init_database_size = int(input("Specify new database size in KB (suggested size 5000): "))
-            length = (1000 * init_database_size)
+            # Get a random number to "break" the database size; multiples of 1000 suggest succesful
+            # decryption.
+            random.seed(os.urandom(256))
+            database_size = random.randint(3000000, 4000000)
             # Get cryptographically safe random bytes to fill "database" file
-            random_pool = os.urandom(length)
+            random_pool = os.urandom(database_size)
             print("DB verification hash: %s" % hashlib.sha256(random_pool).hexdigest())
             # Encrypt random data with master password
             random_encrypted_contents = AESCipher(password).encrypt(random_pool)
             database_file = open(ownPath + arg.file, "w+")
             database_file.write(random_encrypted_contents)
             database_file.close()
-            print("Wrote the database file at %s" % arg.file)
+            print("Wrote the database file at %s, %s bytes" % (arg.file, database_size))
             exit()
         else:
             exit()
     except KeyboardInterrupt:
         exit()
 
-if os.path.isfile(ownPath + arg.file) == True:
+if os.path.isfile(ownPath + arg.file):
     database_file = open(ownPath + arg.file, "r").read()
 else:
     print("No database file found. Generate a database with --init or specify one with -f.")
@@ -145,7 +146,7 @@ else:
 password = getpass()
 # Get and decrypt "database" file.
 decrypted_pool = AESCipher(password).decrypt(database_file)
-if arg.verbose == True:
+if arg.verbose:
     print(" => DB verification hash: %s" % hashlib.sha256(decrypted_pool).hexdigest())
 
 if arg.account:
@@ -167,7 +168,7 @@ while i < work_factor:
 
 timer_end = time.clock()
 timer_result = (timer_end - timer_start)
-if arg.verbose == True:
+if arg.verbose:
     print "\r => Working time for %s iterations was %s seconds" % ((arg.workfactor * 1000), timer_result)
 
 pseudorandom_seed = hashlib.sha256(str(len(account)) + account + str(arg.length)).hexdigest()
@@ -199,14 +200,16 @@ locations = []
 # Get a list of chunks and locations inside chunks.
 i = 0
 while i < (arg.length * 4096):
+    i += 1
     chunk = random.randint(0,999)
     location = random.randint(0,(chunk_size - 1))
     chunks.append(chunk)
     locations.append(location)
-    if arg.verbose == True:
-        sys.stdout.write("\r => Collated chunk %s, byte location %s (chunk %s)" % ( str(chunk).zfill(4), str(location).zfill(len(str(chunk_size))), i))
+    if arg.verbose:
+        sys.stdout.write("\r => Collated chunk %s, byte location %s (character %s/%s)" %
+            ( str(chunk).zfill(4), str(location).zfill(len(str(chunk_size))), ( i / 4096 ), arg.length ))
         sys.stdout.flush()
-    i += 1
+
 
 # Assign seed bytes from choosing pseudorandomly from random source.
 i = 0
@@ -224,12 +227,11 @@ for chunk in chunks:
         # Append 64 seed bytes to a pool.
         seedpool.append(seedbytes)
         seedbytes = ""
-# Re-initialize the random seed
 
-if arg.verbose == True:
+if arg.verbose:
     sys.stdout.write("\n => Seed pool has %s entries." % len(seedpool))
 # Finally generate the printable password based on new seed.
-if arg.verbose == True:
+if arg.verbose:
     sys.stdout.write("\n => Building password from %s\n" % character_pool)
 while len(output) < arg.length:
     # Re-seed the random.choice() for each character with a fresh entry from seedpool
@@ -238,10 +240,12 @@ while len(output) < arg.length:
     while i < 16:
         i += 1
         seed = seed + seedpool.pop()
+    # Seed the random generator with the value obtained previously
     random.seed(seed)
+    # Pick a random character with this seed
     random_character = random.choice(character_pool)
-    if arg.verbose == True:
-        print " => Seeding with %s... %s bytes, picked character \"%s\"" % (seed.encode('hex')[0:32], len(seed), random_character )
+    if arg.verbose:
+        print " => Cycling seed %s... %s bytes, picked character \"%s\"" % (seed.encode('hex')[0:32], len(seed), random_character )
     output = output + random_character
 
 print("Password: %s" % output)
