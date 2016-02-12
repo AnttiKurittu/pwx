@@ -12,6 +12,8 @@
 #     \(            \(   \|____|/  \(        )/
 #      '             '      )/      '        '
 #                           '
+# Logo from http://patorjk.com/software/taag/
+#
 # pwx generates deterministic passwords based on pre-generated cryptographically
 # random database.
 #
