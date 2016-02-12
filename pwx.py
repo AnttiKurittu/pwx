@@ -196,6 +196,7 @@ while i < (arg.length * 4096):
 
 # Assign seed bytes from choosing pseudorandomly from random source.
 i = 0
+seedpool = []
 for chunk in chunks:
     i += 1
     location = locations.pop()
@@ -205,20 +206,21 @@ for chunk in chunks:
             sys.stdout.write("\n")
         sys.stdout.write("\r => Selecting byte %s out of %s: 0x%s" % (i, (arg.length * 4096), newbyte.encode('hex')))
     seedbytes = seedbytes + newbyte
-
+    if len(seedbytes) == 64:
+        # Append 64 seed bytes to a pool.
+        seedpool.append(seedbytes)
+        seedbytes = ""
 # Re-initialize the random seed
 
 if arg.verbose == True:
-    sys.stdout.write("\n => Selected %s seed bytes with sha256 value of %s\n" % (len(seedbytes), hashlib.sha256(seedbytes).hexdigest()))
-
-random.seed(seedbytes)
-
+    sys.stdout.write("\n => Seed pool has %s entries." % len(seedpool))
 # Finally generate the printable password based on new seed.
 if arg.verbose == True:
-    sys.stdout.write(" => Building password from %s\n" % character_pool)
+    sys.stdout.write("\n => Building password from %s\n" % character_pool)
 while len(output) < arg.length:
+    # Re-seed the random.choice() for each character with a fresh entry from seedpool
+    random.seed(seedpool.pop())
     output = output + random.choice(character_pool)
 
 print("Password: %s" % output)
-decrypted_pool = seedbytes = None
 exit()
