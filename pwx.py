@@ -198,7 +198,7 @@ character_pool = string.ascii_letters + string.digits + '!@#$%^-&*()'
 
 # Get a list of chunks and locations inside chunks.
 i = 0
-while i < (password_length * 256):
+while i < (password_length * 4096):
     chunk = random.randint(0,999)
     location = random.randint(0,(chunk_size - 1))
     chunks.append(chunk)
