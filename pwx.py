@@ -88,30 +88,17 @@ if ownPath is "/" or ownPath is "":
 parser = argparse.ArgumentParser(description='Get actions')
 parser.add_argument("-a", "--account", metavar="account name", help="Account to view the password for.", type=str)
 parser.add_argument("-p", "--password", metavar='password', type=str, help="Master password (WARNING! log files may store your shell commands.")
-parser.add_argument("-f", "--file", metavar='database file', type=str, help="database file to use (default: ./pwdb.bin)")
-parser.add_argument("-l", "--length", metavar='length', type=int, help="Password length (default: 24)")
-parser.add_argument("-v", "--verbose", help='Produce more output', action="store_true")
-parser.add_argument("-i", "--init", help="Initialize the database.", action="store_true")
+parser.add_argument("-f", "--file", metavar='database file', type=str, help="database file to use (default: ./pwdb.bin)", default="pwdb.bin")
+parser.add_argument("-l", "--length", metavar='length', type=int, help="Password length (default: 24)", default=24)
+parser.add_argument("-v", "--verbose", help='Produce more output', action="store_true", default=False)
+parser.add_argument("-i", "--init", help="Initialize the database.", action="store_true", default=False)
 arg = parser.parse_args()
-
-# Set default password length unless specified otherwise.
-# Changing password length reseeds password.
-if arg.length == None:
-    password_length = 24
-else:
-    password_length = int(arg.length)
-
-# Define password "database" file.
-if arg.file:
-    database_file_name = arg.file
-else:
-    database_file_name = "pwdb.bin"
 
 # If init is called, create a new "database"
 if arg.init == True:
     print("Initializing password database. Press CTRL-C to abort.")
 
-    if os.path.isfile(ownPath + database_file_name) == True:
+    if os.path.isfile(ownPath + arg.file) == True:
         overwrite = raw_input("Password database exists. Enter \"yes\" to generate new database: ")
     else:
         overwrite = "yes"
@@ -125,16 +112,16 @@ if arg.init == True:
         # Encrypt random data with master password
         print("Verification hash: %s" % hashlib.sha256(random_pool).hexdigest())
         random_encrypted_contents = AESCipher(password).encrypt(random_pool)
-        database_file = open(ownPath + database_file_name, "w+")
+        database_file = open(ownPath + arg.file, "w+")
         database_file.write(random_encrypted_contents)
         database_file.close()
-        print("Wrote the database file at %s" % database_file_name)
+        print("Wrote the database file at %s" % arg.file)
         exit()
     else:
         exit()
 
-if os.path.isfile(ownPath + database_file_name) == True:
-    database_file = open(ownPath + database_file_name, "r").read()
+if os.path.isfile(ownPath + arg.file) == True:
+    database_file = open(ownPath + arg.file, "r").read()
 else:
     print("No database file found. Generate a database with --init or specify one with -f.")
     exit()
@@ -171,7 +158,7 @@ while i < 1000000:
         sys.stdout.flush()
 
 sys.stdout.write("\r\r\r\r\r\r\r\r\r\r")
-pseudorandom_seed = hashlib.sha256(str(len(account)) + account + str(password_length)).hexdigest()
+pseudorandom_seed = hashlib.sha256(str(len(account)) + account + str(arg.length)).hexdigest()
 
 # Split database into a thousand individual chunks.
 chunk_size = len(decrypted_pool) / 1000
@@ -198,7 +185,7 @@ character_pool = string.ascii_letters + string.digits + '!@#$%^-&*()'
 
 # Get a list of chunks and locations inside chunks.
 i = 0
-while i < (password_length * 4096):
+while i < (arg.length * 4096):
     chunk = random.randint(0,999)
     location = random.randint(0,(chunk_size - 1))
     chunks.append(chunk)
@@ -217,7 +204,7 @@ for chunk in chunks:
     if arg.verbose:
         if i == 1:
             sys.stdout.write("\n")
-        sys.stdout.write("\r => Selecting byte %s out of %s: 0x%s" % (i, (password_length * 4096), newbyte.encode('hex')))
+        sys.stdout.write("\r => Selecting byte %s out of %s: 0x%s" % (i, (arg.length * 4096), newbyte.encode('hex')))
     seedbytes = seedbytes + newbyte
 
 # Re-initialize the random seed
@@ -230,7 +217,7 @@ random.seed(seedbytes)
 # Finally generate the printable password based on new seed.
 if arg.verbose == True:
     sys.stdout.write(" => Building password from %s\n" % character_pool)
-while len(output) < password_length:
+while len(output) < arg.length:
     output = output + random.choice(character_pool)
 
 print("Password: %s" % output)
