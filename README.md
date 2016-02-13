@@ -11,12 +11,16 @@ Pwx will not keep record of "stored" passwords, since any key value will return 
 Please familiarize yourself with the source code if you intend to use this for something more than throwaway accounts.
 
 Usage:
-```$ python pwx.py
+```bash
+$ python pwx.py
 Master password: example
 Key / account: GitHub
-Password: OaYnE-HR2xe9B6(xGuqkYy9vQFAanlQ^```
+Password: OaYnE-HR2xe9B6(xGuqkYy9vQFAanlQ^
+```
 
-```$ python pwx.py
+```bash
+$ python pwx.py
 Master password: exmaplef
 Key / account: GitHub
-Password: @n@o0^QPmTY)4HlaBo8*X6$qfeYeRz19```
+Password: @n@o0^QPmTY)4HlaBo8*X6$qfeYeRz19
+```
