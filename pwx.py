@@ -23,7 +23,8 @@
 #
 # Individual account passwords are derived from this random data using a
 # pseudorandom function that produces a determined result with a given account
-# name and password length.
+# name and password length. You do not need to create and store passwords,
+# just remember what account name is used to derive them.
 #
 # The benefit from this is that the attacker can only guess when the decryption
 # has succeeded since wrong master passwords provide right-looking answers
@@ -80,6 +81,7 @@ class AESCipher:
 # Ask for a password and return a 32 character hash for AES encryption.
 # Characters are not masked because the program prints a plaintext password anyway.
 def getpass():
+    """Ask for a password if one is not supplied with a cli argument. """
     if arg.password:
         password = arg.password
     else:
