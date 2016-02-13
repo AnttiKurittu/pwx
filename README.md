@@ -12,10 +12,12 @@ Please familiarize yourself with the source code if you intend to use this for s
 
 Usage:
 ```bash
-$ python pwx.py
+$ python pwx.py --init
+Initializing password database. Press CTRL-C to abort.
+Password database exists. Enter "yes" to generate new database: yes
 Master password: example
-Key / account: GitHub
-Password: OaYnE-HR2xe9B6(xGuqkYy9vQFAanlQ^
+DB verification hash: 457fc72d430de1c85389e4f2d9fa743e7bed0ec28dc9d1cd16a640c0d5163d86
+Wrote the database file at pwdb.bin, 3753651 bytes
 ```
 
 ```bash
