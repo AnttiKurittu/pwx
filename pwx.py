@@ -210,7 +210,6 @@ while i < (arg.length * 4096):
             ( str(chunk).zfill(4), str(location).zfill(len(str(chunk_size))), ( i / 4096 ), arg.length ))
         sys.stdout.flush()
 
-
 # Assign seed bytes from choosing pseudorandomly from random source.
 i = 0
 seedpool = []
@@ -224,7 +223,7 @@ for chunk in chunks:
         sys.stdout.write("\r => Selecting byte %s out of %s: 0x%s" % (i, (arg.length * 4096), newbyte.encode('hex')))
     seedbytes = seedbytes + newbyte
     if len(seedbytes) == 256:
-        # Append 64 seed bytes to a pool.
+        # Append 64 seed bytes to a pool entry.
         seedpool.append(seedbytes)
         seedbytes = ""
 
@@ -234,13 +233,12 @@ if arg.verbose:
 if arg.verbose:
     sys.stdout.write("\n => Building password from %s\n" % character_pool)
 while len(output) < arg.length:
-    # Re-seed the random.choice() for each character with a fresh entry from seedpool
+    # Re-seed the random.choice() for each character with a fresh entry from seed pool
     i = 0
     seed = ""
     while i < 16:
         i += 1
         seed = seed + seedpool.pop()
-    # Seed the random generator with the value obtained previously
     random.seed(seed)
     # Pick a random character with this seed
     random_character = random.choice(character_pool)
