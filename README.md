@@ -22,7 +22,7 @@ Wrote the database file at pwdb.bin, 3753651 bytes
 
 ```bash
 $ python pwx.py
-Master password: exmaplef
-Key / account: GitHub
-Password: @n@o0^QPmTY)4HlaBo8*X6$qfeYeRz19
+Master password: example
+Key / account: example account
+Password: 98SaseMRrj#-K-@OVE(Cxn28#lGGZARn
 ```
