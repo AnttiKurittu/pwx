@@ -64,16 +64,19 @@ pad = lambda s: s + (BS - len(s) % BS) * chr(BS - len(s) % BS)
 unpad = lambda s : s[:-ord(s[len(s)-1:])]
 
 class AESCipher:
+    '''PyCrypto AES'''
     def __init__( self, key ):
         self.key = key
 
     def encrypt( self, raw ):
+        '''Encrypt string'''
         raw = pad(raw)
         iv = CRandom.new().read( AES.block_size )
         cipher = AES.new( self.key, AES.MODE_CBC, iv )
         return iv + cipher.encrypt( raw )
 
     def decrypt( self, enc ):
+        '''Decrytp string'''
         iv = enc[:16]
         cipher = AES.new(self.key, AES.MODE_CBC, iv )
         return unpad(cipher.decrypt( enc[16:] ))
@@ -92,6 +95,27 @@ def getpass():
     # Hash the password to 32 characters AES can use it for encryption.
     passwordhash = hashlib.md5(hashlib.sha256(password).hexdigest()).hexdigest()
     return passwordhash
+
+def work(workfactor, data):
+    '''Increase computational cost by iterating hash values'''
+    i = s = 0
+    timer_start = time.clock()
+    while i < workfactor:
+        data = hashlib.sha256(data).hexdigest()
+        i += 1
+        s += 1
+        if s == 10000 and arg.verbose:
+            if i == 10000:
+                sys.stdout.write(" => Working %s rounds" % workfactor)
+            sys.stdout.write(".")
+            sys.stdout.flush()
+            s = 0
+        if i == (workfactor - 1) and arg.verbose:
+            sys.stdout.write("\n")
+            sys.stdout.flush
+    timer_end = time.clock()
+    timer_result = (timer_end - timer_start)
+    return data, timer_result
 
 ownPath = os.path.dirname(sys.argv[0]) + "/"
 if ownPath is "/" or ownPath is "":
@@ -123,6 +147,7 @@ if arg.init:
             # Get a random number to "break" the database size; multiples of 1000 suggest succesful
             # decryption.
             random.seed(os.urandom(256))
+            # Resist guessing correct decryption key by making non-evensized database.
             database_size = random.randint(3000000, 4000000)
             # Get cryptographically safe random bytes to fill "database" file
             random_pool = os.urandom(database_size)
@@ -159,25 +184,22 @@ else:
 # Work factor for n iterations of sha256. This hash is used to seed the
 # pseudorandom generator.
 i = s = 0
-work_factor = arg.workfactor * 1000
 character_pool = string.ascii_letters + string.digits + '!@#$%^-&*()'
 
-timer_start = time.clock()
+work_factor = arg.workfactor * 1000
+# iterate to cause computational cost
+work_results = work(work_factor, account)
+account = work_results[0]
 
-while i < work_factor:
-    account = hashlib.sha256(account).hexdigest()
-    i += 1
-
-timer_end = time.clock()
-timer_result = (timer_end - timer_start)
 if arg.verbose:
-    print "\r => Working time for %s iterations was %s seconds" % ((arg.workfactor * 1000), timer_result)
+    print "\r => Working time for %s iterations was %s seconds" % ((arg.workfactor * 1000), work_results[1])
 
 pseudorandom_seed = hashlib.sha256(str(len(account)) + account + str(arg.length)).hexdigest()
 
 # Split database into a thousand individual chunks.
 chunk_size = len(decrypted_pool) / 1000
 decrypted_chunks = []
+
 i = 0
 while i < int( len(decrypted_pool) / chunk_size ):
     cursor = i * chunk_size
@@ -222,7 +244,7 @@ for chunk in chunks:
     if arg.verbose:
         if i == 1:
             sys.stdout.write("\n")
-        sys.stdout.write("\r => Selecting byte %s out of %s: 0x%s" % (i, (arg.length * 4096), newbyte.encode('hex')))
+        sys.stdout.write("\r => Selecting byte %s out of %s: 0x%s" % (i, (arg.length * 4096), newbyte.encode('hex').upper()))
     seedbytes = seedbytes + newbyte
     if len(seedbytes) == 256:
         # Append 64 seed bytes to a pool entry.
@@ -245,7 +267,7 @@ while len(output) < arg.length:
     # Pick a random character with this seed
     random_character = random.choice(character_pool)
     if arg.verbose:
-        print " => Cycling seed %s... %s bytes, picked character \"%s\"" % (seed.encode('hex')[0:32], len(seed), random_character )
+        print " => Cycling seed %s... %s bytes, picked character \"%s\"" % (seed.encode('hex')[0:32].upper(), len(seed), random_character )
     output = output + random_character
 
 print("Password: %s" % output)
