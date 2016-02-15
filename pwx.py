@@ -1,3 +1,5 @@
+#!/usr/bin/python
+#encoding -*- UTF-8 -*-
 #
 #        _____    _____
 #    ___|\    \  |\    \   _____ _____      _____
@@ -54,6 +56,7 @@ import string
 import hashlib
 import argparse
 import time
+import getpass
 from Crypto.Cipher import AES
 from Crypto import Random as CRandom
 
@@ -76,20 +79,19 @@ class AESCipher:
         return iv + cipher.encrypt( raw )
 
     def decrypt( self, enc ):
-        '''Decrytp string'''
+        '''Decrypt string'''
         iv = enc[:16]
         cipher = AES.new(self.key, AES.MODE_CBC, iv )
         return unpad(cipher.decrypt( enc[16:] ))
 
 # Ask for a password and return a 32 character hash for AES encryption.
-# Characters are not masked because the program prints a plaintext password anyway.
-def getpass():
-    """Ask for a password if one is not supplied with a cli argument. """
+def askpass():
+    '''Ask for a password if one is not supplied with a cli argument. '''
     if arg.password:
         password = arg.password
     else:
         try:
-            password = raw_input("Master password: ")
+            password = getpass.getpass("Master password: ")
         except KeyboardInterrupt:
             exit()
     # Hash the password to 32 characters AES can use it for encryption.
@@ -121,6 +123,8 @@ ownPath = os.path.dirname(sys.argv[0]) + "/"
 if ownPath is "/" or ownPath is "":
     ownPath = "./"
 
+
+
 # Get command line arguments.
 parser = argparse.ArgumentParser(description='Get actions')
 parser.add_argument("-a", "--account", metavar="account name", help="Account to view the password for.", type=str)
@@ -143,7 +147,7 @@ if arg.init:
             overwrite = "yes"
 
         if overwrite == "yes":
-            password = getpass()
+            password = askpass()
             # Get a random number to "break" the database size; multiples of 1000 suggest succesful
             # decryption.
             random.seed(os.urandom(256))
@@ -170,7 +174,10 @@ else:
     print("No database file found. Generate a database with --init or specify one with -f.")
     exit()
 
-password = getpass()
+if os.path.isfile(ownPath + "wordlist.txt"):
+    wordlist = open(ownPath + "wordlist.txt", "r").readlines()
+
+password = askpass()
 # Get and decrypt "database" file.
 decrypted_pool = AESCipher(password).decrypt(database_file)
 if arg.verbose:
@@ -186,9 +193,8 @@ else:
 i = s = 0
 character_pool = string.ascii_letters + string.digits + '!@#$%^-&*()'
 
-work_factor = arg.workfactor * 1000
 # iterate to cause computational cost
-work_results = work(work_factor, account)
+work_results = work(arg.workfactor * 1000, account)
 account = work_results[0]
 
 if arg.verbose:
@@ -269,6 +275,15 @@ while len(output) < arg.length:
     if arg.verbose:
         print " => Cycling seed %s... %s bytes, picked character \"%s\"" % (seed.encode('hex')[0:32].upper(), len(seed), random_character )
     output = output + random_character
+
+if wordlist:
+    i = 0
+    sys.stdout.write("Phrase: ")
+    while i < 6:
+        i += 1
+        random_word = random.randint(0,998)
+        sys.stdout.write(wordlist[random_word].replace("\n", " ").lower())
+    sys.stdout.write("\r\n")
 
 print("Password: %s" % output)
 exit()
